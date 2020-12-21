@@ -1,0 +1,238 @@
+#include <stdio.h>
+#include <stdint.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <arpa/inet.h>
+#include <string.h>
+#define CHUNK (516)
+
+
+
+char wrq[CHUNK];
+
+
+static int status = 0;
+int packet_size = 0;
+int recv_packets = 0;
+
+
+
+int clear_buffer(char *buffer);
+int Build_RRQ_Packet(char *buffer, char *filename);
+int Build_WRQ_Packet(char *buffer, char *filename);
+int Get_Error(char *packet);
+int Get_size(char *buffer);
+int Build_ACK_Packet(char *buffer);
+void Write(const char *filename, char *buffer);
+void Get_File(char *filename);
+
+int main(int argc, char *argv[])
+{
+  char filename[100];
+  Get_File(filename);
+  struct sockaddr_in v4address = { AF_INET, htons(69) };
+  if((status = inet_pton(AF_INET, argv[1], &v4address.sin_addr)) < 0)
+  {
+    printf("Inet_pton error occured\n");
+    return 1;
+  }
+
+  int socketid = socket(PF_INET, SOCK_DGRAM, 0);
+  if (socketid < 0)
+  {
+    printf("Couldn't create socket\n");
+    return socketid;
+  }
+
+  /* Builds Write request packet */
+  Build_RRQ_Packet(wrq, filename);
+  /* Send write request packet */
+  sendto(socketid, wrq, Get_size(wrq), 0, (struct sockaddr*) &v4address, sizeof(v4address));
+
+  FILE *p = fopen(filename, "w");
+  while(1)
+  {
+    int addr_size =  sizeof(v4address);
+    /* Recieve packet from server */
+    packet_size = recvfrom(socketid, wrq, 516, 0, (struct sockaddr*) &v4address, &addr_size);
+    recv_packets += packet_size;
+
+    if (packet_size - 4 < 0)
+    {
+      printf("Error\n");
+      return -1;
+    }
+    /* Check if opcode is 5 (Error) */
+    if (wrq[1] == 5)
+    {
+        Get_Error(wrq);
+        return -1;  /* Error */
+    }
+    fwrite(&wrq[4], 1, packet_size - 4, p);
+    /* build acknowledgement packet */
+    Build_ACK_Packet(wrq);
+    /* Send acknowledgement packet */
+    sendto(socketid, wrq, 4, 0, (struct sockaddr*) &v4address, sizeof(v4address));
+    /* If this is the last packet break loop */
+    if(packet_size -4 != 512)
+      break;
+
+  }
+  printf("%d bytes recieved from %s\n", recv_packets, inet_ntoa(v4address.sin_addr));
+
+  if((status = close(socketid)) < 0)
+  {
+    printf("Error whiile closing socket\n");
+    return status;
+  }
+
+  return 0;
+}
+
+int Build_RRQ_Packet(char *buffer, char *filename)
+{
+  buffer[0] = 0;
+  buffer[1] = 1;
+  char *p = buffer + 2;
+  /*
+  char c;
+  while((c = getchar()) != '\n')
+  {
+    *p = c;
+    p++;
+  }
+  *++p = 0;
+  */
+  strcat(p, filename);
+  p += strlen(filename) +1;
+
+  strcat(p, "netascii");
+  p += strlen("netascii");
+  *p = 0;
+  *p++ = '\0';
+  return 0;
+}
+int clear_buffer(char *buffer)
+{
+  char *p = &buffer[0];
+  for (;p < &buffer[CHUNK]; p++)
+  {
+    *p = 0;
+  }
+  return 0;
+}
+int Build_WRQ_Packet(char *buffer, char *filename)
+{
+  printf("Filename: ");
+  buffer[0] = 0;
+  buffer[1] = 2;
+  char *p = buffer + 2;
+  char c;
+  while((c = getchar()) != '\n')
+  {
+    *p = c;
+    p++;
+  }
+  *++p = 0;
+
+  strcat(p, "netascii");
+  p += strlen("netascii");
+  *p = 0;
+
+  return 0;
+}
+int Get_Error(char *packet)
+{
+  char *errors[] =
+  {
+   "Not defined, see error message (if any)",
+   "File not found",
+   "Access violation",
+   "Disk full or allocation exceeded",
+   "Illegal TFTP operation",
+   "Unknown transfer ID",
+   "File already exists",
+   "No such user"
+ };
+ char *p = &packet[3];
+   switch (*p)
+   {
+     case 0:
+      printf("%s\n",errors[0]);
+     case 1:
+      printf("%s\n",errors[1]);
+      break;
+     case 2:
+      printf("%s\n",errors[2]);
+      break;
+     case 3:
+      printf("%s\n",errors[3]);
+      break;
+     case 4:
+      printf("%s\n",errors[4]);
+      break;
+     case 5:
+      printf("%s\n",errors[5]);
+      break;
+     case 6:
+      printf("%s\n",errors[6]);
+      break;
+     case 7:
+      printf("%s\n",errors[7]);
+      break;
+     default:
+      printf("Invalid error code\n");
+   };
+   return 0;
+}
+int Build_ACK_Packet(char *buffer)
+{
+  buffer[0] = 0;
+  buffer[1] = 4;
+  return 0;
+}
+int Get_size(char *buffer)
+{
+  int count = 0;
+  int flag = 3;
+  char *p = buffer;
+  while (flag != 0)
+  {
+    if(*p == 0)
+    {
+      count++;
+      p++;
+      flag--;
+      continue;
+    }
+    count++;
+    p++;
+  }
+  return count;
+}
+void Write(const char *filename, char *buffer)
+{
+  char *writeto = &buffer[4];
+  FILE *p = NULL;
+  p = fopen(filename, "w");
+  if (p == NULL)
+  {
+    goto end;
+  }
+  fwrite(&wrq[4], 1, packet_size - 4, p);
+  fclose(p);
+  end:
+    printf("Failed to open file\n");
+    fclose(p);
+}
+void Get_File(char *filename)
+{
+  char c;
+  int cn = 0;
+  while((c = getchar()) != '\n')
+  {
+    filename[cn] = c;
+    cn++;
+  }
+  filename[cn+1] = 0;
+}
