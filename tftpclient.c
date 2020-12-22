@@ -1,22 +1,22 @@
+/* Included headers */
 #include <stdio.h>
 #include <stdint.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
 #include <string.h>
+
+/* Definitions */
 #define CHUNK (516)
+#define ACK_PACKET_LENGTH (4)
 
-
-
+/* Global Variables */
 char wrq[CHUNK];
-
-
 static int status = 0;
 int packet_size = 0;
 int recv_packets = 0;
 
-
-
+/* Functions prototypes */
 int clear_buffer(char *buffer);
 int Build_RRQ_Packet(char *buffer, char *filename);
 int Build_WRQ_Packet(char *buffer, char *filename);
@@ -26,17 +26,19 @@ int Build_ACK_Packet(char *buffer);
 void Write(const char *filename, char *buffer);
 void Get_File(char *filename);
 
+
 int main(int argc, char *argv[])
 {
   char filename[100];
   Get_File(filename);
+
   struct sockaddr_in v4address = { AF_INET, htons(69) };
   if((status = inet_pton(AF_INET, argv[1], &v4address.sin_addr)) < 0)
   {
     printf("Inet_pton error occured\n");
     return 1;
   }
-
+  /* Create socket */
   int socketid = socket(PF_INET, SOCK_DGRAM, 0);
   if (socketid < 0)
   {
@@ -72,7 +74,7 @@ int main(int argc, char *argv[])
     /* build acknowledgement packet */
     Build_ACK_Packet(wrq);
     /* Send acknowledgement packet */
-    sendto(socketid, wrq, 4, 0, (struct sockaddr*) &v4address, sizeof(v4address));
+    sendto(socketid, wrq, ACK_PACKET_LENGTH, 0, (struct sockaddr*) &v4address, sizeof(v4address));
     /* If this is the last packet break loop */
     if(packet_size -4 != 512)
       break;
