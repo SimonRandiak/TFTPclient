@@ -31,7 +31,6 @@ void Get_File(char *filename);
 int main(int argc, char *argv[])
 {
   char filename[100];
-  Get_File(filename);
 
   struct sockaddr_in v4address = { AF_INET, htons(69) };
 
@@ -49,9 +48,24 @@ int main(int argc, char *argv[])
     printf("Couldn't create socket\n");
     return socketid;
   }
+  char option[5];
 
-  /* Builds Write request packet */
-  Build_RRQ_Packet(wrq, filename);
+  readchar(option); /* Get option from user */
+  fflush(stdin);  /* Clears input buffer */
+
+  if (strcmp("get", option) == 0)
+  {
+    Get_File(filename);
+    /* Builds Write request packet */
+    Build_RRQ_Packet(wrq, filename);
+  }
+  else if (strcmp("put", option) == 0)
+  {
+    Get_File(filename);
+    /* Builds Write request packet */
+    Build_WRQ_Packet(wrq, filename);
+  }
+
 
 
   /* Send write request packet */
@@ -74,6 +88,10 @@ int main(int argc, char *argv[])
 
     ack_block = ((unsigned short)wrq[2] << 8) | (unsigned short)wrq[3];
     recv_packets += packet_size;
+
+    /* Print some information on screen */
+    printf("%d bytes recieved from %s\n", packet_size, inet_ntoa(v4address.sin_addr));
+    printf("%d acknowledgement recieved from %s\n", ack_current - 1, inet_ntoa(v4address.sin_addr));
 
     if (packet_size - 4 < 0)
     {
@@ -115,10 +133,10 @@ int main(int argc, char *argv[])
       break;
 
   }
-  printf("Done!\n");
+  printf("\nDone!\n");
 
-  printf("%d bytes recieved from %s\n", recv_packets, inet_ntoa(v4address.sin_addr));
-  printf("%d acknowledgement recieved from %s\n", ack_current - 1, inet_ntoa(v4address.sin_addr));
+  printf("%d Total bytes recieved from %s\n", recv_packets, inet_ntoa(v4address.sin_addr));
+  printf("%d Total acknowledgement recieved from %s\n", ack_current - 1, inet_ntoa(v4address.sin_addr));
 
   if((status = close(socketid)) < 0)
   {
@@ -263,13 +281,19 @@ int readchar(char *buffer)
 {
   char character;
   int character_count;
-  char *p = &buffer[0];
+  char *p = buffer;
   while((character = getchar()) != '\n')
   {
-    *p = character;
-    character_count++;
-    p++;
+    if (character != ' ')
+    {
+      *p = character;
+      character_count++;
+      p++;
+    }
+    else
+      continue;
   }
   *p = '\0';
+
   return character_count;
 }
