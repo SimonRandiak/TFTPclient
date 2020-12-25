@@ -23,7 +23,9 @@ int Build_WRQ_Packet(char *buffer, char *filename);
 int Get_Error(char *packet);
 int Get_size(char *buffer);
 int Build_ACK_Packet(char *buffer);
+int readchar(char *buffer);
 void Get_File(char *filename);
+
 
 
 int main(int argc, char *argv[])
@@ -256,4 +258,18 @@ void Get_File(char *filename)
   }
   filename[cn+1] = 0;
 
+}
+int readchar(char *buffer)
+{
+  char character;
+  int character_count;
+  char *p = &buffer[0];
+  while((character = getchar()) != '\n')
+  {
+    *p = character;
+    character_count++;
+    p++;
+  }
+  *p = '\0';
+  return character_count;
 }
