@@ -48,31 +48,26 @@ int main(int argc, char *argv[])
     printf("Couldn't create socket\n");
     return socketid;
   }
+  
+  /*
   char option[5];
 
-  readchar(option); /* Get option from user */
-  fflush(stdin);  /* Clears input buffer */
+  readchar(option);
+  fflush(stdin);
+  */
 
-  if (strcmp("get", option) == 0)
-  {
-    Get_File(filename);
-    /* Builds Write request packet */
-    Build_RRQ_Packet(wrq, filename);
-  }
-  else if (strcmp("put", option) == 0)
-  {
-    Get_File(filename);
-    /* Builds Write request packet */
-    Build_WRQ_Packet(wrq, filename);
-  }
+  printf("Tftp>");
+  Get_File(filename);
 
-
+  /* Builds Read request packet */
+  Build_RRQ_Packet(wrq, filename);
 
   /* Send write request packet */
   sendto(socketid, wrq, Get_size(wrq), 0, (struct sockaddr*) &v4address, sizeof(v4address));
 
   /* set ack_current to 1 */
   ack_current = 1;
+
 
   FILE *p = fopen(filename, "w");
 
@@ -85,8 +80,11 @@ int main(int argc, char *argv[])
     /* Recieve packet from server */
     packet_size = recvfrom(socketid, wrq, 516, 0, (struct sockaddr*) &v4address, &addr_size);
 
-
+    /*
     ack_block = ((unsigned short)wrq[2] << 8) | (unsigned short)wrq[3];
+    */
+
+    uint16_t ackt = wrq[2] << 8 | wrq[3];
     recv_packets += packet_size;
 
     /* Print some information on screen */
@@ -106,19 +104,20 @@ int main(int argc, char *argv[])
     }
 
     /* If there is some data and not duplicated write to file */
-    if ((packet_size - 4 > 0) && (ack_block == ack_current))
+    if ((packet_size - 4 > 0) && (ackt > ack_current - 1))
     {
       /* Write to file */
       fwrite(&wrq[4], 1, (packet_size - 4), p);
+      ack_current++;
       if (ferror(p))
       {
         printf("Failed while writing to file\n");
         return -1;
       }
-      ack_current++;
     }
     else
     {
+      wrq[2] = ack_current >> 8;
       wrq[3] = ack_current;
     }
 
@@ -126,17 +125,24 @@ int main(int argc, char *argv[])
     Build_ACK_Packet(wrq);
 
     /* Send acknowledgement packet */
-    sendto(socketid, wrq, ACK_PACKET_LENGTH, 0, (struct sockaddr*) &v4address, sizeof(v4address));
+    status = sendto(socketid, wrq, ACK_PACKET_LENGTH, 0, (struct sockaddr*) &v4address, sizeof(v4address));
+
+    if (status == -1)
+    {
+      printf("Error while sending datagram\n");
+      return status;
+    }
+
 
     /* If this is the last packet break the loop */
-    if(packet_size -4 != 512)
+    if(packet_size - 4 != 512)
       break;
 
   }
-  printf("\nDone!\n");
+  printf("\nDone\n");
 
   printf("%d Total bytes recieved from %s\n", recv_packets, inet_ntoa(v4address.sin_addr));
-  printf("%d Total acknowledgement recieved from %s\n", ack_current - 1, inet_ntoa(v4address.sin_addr));
+  printf("%d Total acknowledgement recieved from %s\n", ack_current, inet_ntoa(v4address.sin_addr));
 
   if((status = close(socketid)) < 0)
   {
