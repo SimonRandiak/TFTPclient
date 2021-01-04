@@ -14,8 +14,8 @@ int Build_WRQ_Packet(char *buffer, char *filename);
 void Build_ACK_Packet(char *buffer, uint16_t block_number);
 void Build_DATA_Packet(char *buffer, uint16_t block_number);
 void Get_TFTP_error(char *buffer);
-int RRQ_loop(int socketfd, struct sockaddr_in serveraddr);
-int WRQ_loop(int socketfd, struct sockaddr_in serveraddr);
+int RRQ_loop(int socketfd, struct sockaddr_in serveraddr, char *filename);
+int WRQ_loop(int socketfd, struct sockaddr_in serveraddr, char *filename);
 
 typedef enum
 {
@@ -36,6 +36,7 @@ int main(int argc, char *argv[])
   }
 
   int socketfd;
+  char opt[5], filename[100];
   struct sockaddr_in   serveraddr;
   memset(&serveraddr, 0, sizeof(serveraddr));
 
@@ -50,10 +51,19 @@ int main(int argc, char *argv[])
   serveraddr.sin_port = htons(DEFAULT_PORT);
   inet_pton(AF_INET, argv[1], &serveraddr.sin_addr);
 
-  /*
-  RRQ_loop(socketfd, serveraddr);
-  */
-  WRQ_loop(socketfd, serveraddr);
+  scanf("%s %s", opt, filename);
+  if (strcmp("put", opt) == 0)
+  {
+    WRQ_loop(socketfd, serveraddr, filename);
+  }
+  else if (strcmp("get", opt) == 0)
+  {
+    RRQ_loop(socketfd, serveraddr, filename);
+  }
+  else
+  {
+    printf("Invalid operation\n");
+  }
 
   shutdown(socketfd, SHUT_RDWR);
 
@@ -176,10 +186,12 @@ void Get_TFTP_error(char *buffer)
       printf("Invalid error code\n"); break;
   }
 }
-int RRQ_loop(int socketfd, struct sockaddr_in serveraddr)
+int RRQ_loop(int socketfd, struct sockaddr_in serveraddr, char *filename)
 {
   char packet[PACKET_SIZE+1];
+  /*
   char filename[100];
+  */
   int recvfd,   sendfd, size, addr_size;
   uint16_t ack_count = 1;
   uint16_t last_packet = 0;
@@ -189,7 +201,9 @@ int RRQ_loop(int socketfd, struct sockaddr_in serveraddr)
 
   addr_size = sizeof(serveraddr);
 
+  /*
   Get_File(filename);
+  */
 
   size = Build_RRQ_Packet(packet, filename);
 
@@ -247,10 +261,12 @@ int RRQ_loop(int socketfd, struct sockaddr_in serveraddr)
   return 0;
 }
 
-int WRQ_loop(int socketfd, struct sockaddr_in serveraddr)
+int WRQ_loop(int socketfd, struct sockaddr_in serveraddr, char *filename)
 {
   char packet[PACKET_SIZE+1];
+  /*
   char filename[100];
+  */
   int recvfd,   sendfd, size, addr_size;
   uint16_t ack_count = 0;
   uint16_t last_packet = 0;
@@ -260,7 +276,9 @@ int WRQ_loop(int socketfd, struct sockaddr_in serveraddr)
 
   addr_size = sizeof(serveraddr);
 
+  /*
   Get_File(filename);
+  */
 
   size = Build_WRQ_Packet(packet, filename);
 
